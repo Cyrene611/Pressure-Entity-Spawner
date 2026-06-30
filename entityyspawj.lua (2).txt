@@ -1,0 +1,603 @@
+-- =====================================================================
+-- CONFIGURATION & SERVICES
+-- =====================================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Workspace = workspace
+local Gameplay = Workspace:WaitForChild("GameplayFolder")
+local Rooms = Gameplay:WaitForChild("Rooms")
+local Camera = Workspace.CurrentCamera
+
+local SoundService = game:GetService("SoundService")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+local BREAK_SOUND_ID = "rbxassetid://13303926122"
+
+local Remotes = ReplicatedStorage:WaitForChild("Events")
+local URSpecialEffects = Remotes:WaitForChild("URSpecialEffects")
+
+-- =====================================================================
+-- CONSTANTS (Non-Hardcoded setup)
+-- =====================================================================
+local ENTITY_ASSET_ID = "rbxassetid://71148476112454"
+local Y_OFFSET = Vector3.new(0, 4, 0)
+local DESPOWN_Y_OFFSET = Vector3.new(0, 30, 0)
+local MOVE_SPEED = 40
+local TOLERANCE = 0.1
+
+local SHAKE_RADIUS = 100
+
+local Config = {
+    FlickerSpeed = 75,
+    MaxDarkness = 0.2
+}
+
+local ShakeConfig = {
+    Intensity = 2.5,
+    SpeedMultiplier = 1.5
+}
+
+-- =====================================================================
+-- CAMERA SHAKE SYSTEM (SCREEN SHAKE)
+-- =====================================================================
+local function getOrCreateBlackoutGui()
+    local gui = PlayerGui:FindFirstChild("PressureBlackoutGui")
+    if not gui then
+        gui = Instance.new("ScreenGui")
+        gui.Name = "PressureBlackoutGui"
+        gui.IgnoreGuiInset = true
+        gui.ResetOnSpawn = false
+        gui.Parent = PlayerGui
+
+        local frame = Instance.new("Frame")  
+        frame.Name = "BlackFrame"  
+        frame.Size = UDim2.new(1, 0, 1, 0)  
+        frame.BackgroundColor3 = Color3.new(0, 0, 0)  
+        frame.BorderSizePixel = 0  
+        frame.BackgroundTransparency = 1  
+        frame.Parent = gui  
+    end  
+    return gui:FindFirstChild("BlackFrame")
+end
+
+local function initializeBypassedShaker()
+    local playerCamera = workspace.CurrentCamera
+    if not playerCamera then return nil end
+
+    local currentCFrame = playerCamera.CFrame  
+
+    local function cameraCallback(shakeCFrame)  
+        playerCamera.CFrame = currentCFrame * shakeCFrame  
+    end  
+
+    local renderPriority = Enum.RenderPriority.Camera.Value + 1  
+      
+    local shakerInstance = {  
+        ["_running"] = false,  
+        ["_renderName"] = "BypassedCameraShaker",  
+        ["_renderPriority"] = renderPriority,  
+        ["_camShakeInstances"] = {},  
+        ["_removeInstances"] = {},  
+        ["_callback"] = cameraCallback  
+    }  
+
+    RunService:BindToRenderStep(shakerInstance._renderName, shakerInstance._renderPriority, function(deltaTime)  
+        currentCFrame = playerCamera.CFrame  
+          
+        local posAccumulator = Vector3.new()  
+        local rotAccumulator = Vector3.new()  
+        local instances = shakerInstance._camShakeInstances  
+          
+        for i = 1, #instances do  
+            local inst = instances[i]  
+            if inst.currentFadeTime <= 0 and not inst.sustain then  
+                shakerInstance._removeInstances[#shakerInstance._removeInstances + 1] = i  
+            else  
+                local deltaTick = inst.tick  
+                local fadeTime = inst.currentFadeTime  
+                local noiseVal = Vector3.new(math.noise(deltaTick, 0) * 0.5, math.noise(0, deltaTick) * 0.5, math.noise(deltaTick, deltaTick) * 0.5)  
+                  
+                if inst.fadeInDuration > 0 and inst.sustain then  
+                    if fadeTime < 1 then  
+                        fadeTime = fadeTime + deltaTime / inst.fadeInDuration  
+                    end  
+                end  
+                if not inst.sustain then  
+                    fadeTime = fadeTime - deltaTime / inst.fadeOutDuration  
+                end  
+                if inst.sustain then  
+                    inst.tick = deltaTick + deltaTime * inst.Roughness * inst.roughMod  
+                else  
+                    inst.tick = deltaTick + deltaTime * inst.Roughness * inst.roughMod * fadeTime  
+                end  
+                inst.currentFadeTime = math.clamp(fadeTime, 0, 1)  
+                  
+                local shakeVector = noiseVal * inst.Magnitude * inst.magnMod * fadeTime  
+                posAccumulator = posAccumulator + shakeVector * inst.PositionInfluence  
+                rotAccumulator = rotAccumulator + shakeVector * inst.RotationInfluence  
+            end  
+        end  
+          
+        for i = #shakerInstance._removeInstances, 1, -1 do  
+            table.remove(instances, shakerInstance._removeInstances[i])  
+            shakerInstance._removeInstances[i] = nil  
+        end  
+          
+        local finalCFrame = CFrame.new(posAccumulator) * CFrame.Angles(0, math.rad(rotAccumulator.Y), 0) * CFrame.Angles(math.rad(rotAccumulator.X), 0, math.rad(rotAccumulator.Z))  
+        shakerInstance._callback(finalCFrame)  
+    end)  
+
+    shakerInstance._running = true  
+    return shakerInstance
+end
+
+local activeShaker = initializeBypassedShaker()
+
+local function shakeCameraInfinite(presetName)
+    if not activeShaker then return end
+
+    local presets = {  
+        ["Bump"] = {Magnitude = 2.5, Roughness = 4, FadeIn = 0.1, PosInf = Vector3.new(0.15, 0.15, 0.15), RotInf = Vector3.new(1, 1, 1)},  
+        ["Explosion"] = {Magnitude = 5, Roughness = 10, FadeIn = 0.1, PosInf = Vector3.new(0.25, 0.25, 0.25), RotInf = Vector3.new(4, 1, 1)},  
+        ["Earthquake"] = {Magnitude = 0.6, Roughness = 3.5, FadeIn = 2, PosInf = Vector3.new(0.25, 0.25, 0.25), RotInf = Vector3.new(1, 1, 4)},  
+        ["BadTrip"] = {Magnitude = 10, Roughness = 0.15, FadeIn = 5, PosInf = Vector3.new(0, 0, 0.15), RotInf = Vector3.new(2, 1, 4)},  
+        ["HandheldCamera"] = {Magnitude = 1, Roughness = 0.25, FadeIn = 5, PosInf = Vector3.new(0, 0, 0), RotInf = Vector3.new(1, 0.5, 0.5)},  
+        ["Vibration"] = {Magnitude = 0.4, Roughness = 20, FadeIn = 2, PosInf = Vector3.new(0, 0.15, 0), RotInf = Vector3.new(1.25, 0, 4)},  
+        ["RoughDriving"] = {Magnitude = 2, Roughness = 3, FadeIn = 1, PosInf = Vector3.new(0, 0, 0), RotInf = Vector3.new(1, 1, 1)}  
+    }  
+
+    local data = presets[presetName]  
+    if not data then return end  
+
+    local newInstance = {  
+        ["Magnitude"] = data.Magnitude,  
+        ["Roughness"] = data.Roughness,  
+        ["PositionInfluence"] = data.PosInf,  
+        ["RotationInfluence"] = data.RotInf,  
+        ["roughMod"] = ShakeConfig.SpeedMultiplier,  
+        ["magnMod"] = ShakeConfig.Intensity,  
+        ["fadeOutDuration"] = 0.5,  
+        ["fadeInDuration"] = data.FadeIn,  
+        ["sustain"] = true,  
+        ["currentFadeTime"] = 0,  
+        ["tick"] = Random.new():NextNumber(-100, 100)  
+    }  
+
+    table.insert(activeShaker._camShakeInstances, newInstance)
+end
+
+-- =====================================================================
+-- LOAD & ENTITY SETUP
+-- =====================================================================
+local function loadEntityModel()
+    local model = game:GetObjects(ENTITY_ASSET_ID)[1]
+    model.Parent = Workspace
+
+    if not model.PrimaryPart then  
+        local firstPart = model:FindFirstChildWhichIsA("BasePart", true)  
+        assert(firstPart, "[EntitySystem] Model không có BasePart hợp lệ.")  
+        model.PrimaryPart = firstPart  
+    end  
+    return model
+end
+
+local entityModel = loadEntityModel()
+local rootPart = entityModel.PrimaryPart
+
+local function playBreakSound(part)
+    if not part then return end
+
+    local sound = Instance.new("Sound")  
+    sound.SoundId = "rbxassetid://13303926122"  
+    sound.Volume = 1  
+    sound.RollOffMaxDistance = 80  
+    sound.Parent = part  
+
+    sound:Play()  
+
+    sound.Ended:Connect(function()  
+        sound:Destroy()  
+    end)
+end
+
+-- =====================================================================
+-- PROXIMITY & HITBOX SYSTEM (CỰC LY RUNG & BLACKOUT < 30 STUDS)
+-- =====================================================================
+local isShaking = false
+local isBlackoutActive = false
+local proximityConnection = nil
+local flickerConnection = nil -- Sử dụng biến cục bộ này thay vì gán attribute "FlickerConnection"
+
+-- Hàm tính toán giá trị tỷ lệ nghịch theo khoảng cách (càng gần càng lớn)
+local function mapValue(val, inMin, inMax, outMin, outMax)
+    local clamped = math.clamp(val, inMin, inMax)
+    return outMin + (clamped - inMin) / (inMax - inMin) * (outMax - outMin)
+end
+
+proximityConnection = RunService.RenderStepped:Connect(function()
+    if entityFinished then 
+        -- Dọn dẹp trạng thái nếu thực thể kết thúc
+        if proximityConnection then
+            proximityConnection:Disconnect()
+            proximityConnection = nil
+        end
+        return 
+    end
+    
+    if not rootPart or not rootPart.Parent then 
+        despawnEntity()
+        return 
+    end
+    
+    local character = Player.Character
+    local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if rootPart and humanoidRootPart then
+        local distance = (humanoidRootPart.Position - rootPart.Position).Magnitude
+        
+        -- Ở trong bán kính rung (100 studs)
+        if distance <= SHAKE_RADIUS then
+            local blackFrame = getOrCreateBlackoutGui()
+            
+            -- 1. Cơ chế rung tăng dần khi lại gần (Khoảng cách từ 100 đến 0)
+            local dynamicMagnitude = mapValue(distance, 0, 100, 3.5, 0.1)
+            local dynamicRoughness = mapValue(distance, 0, 100, 25, 5)
+
+            if not isShaking then
+                isShaking = true
+                activeShaker._camShakeInstances = {}
+                
+                local newInstance = {  
+                    ["Magnitude"] = dynamicMagnitude,  
+                    ["Roughness"] = dynamicRoughness,  
+                    ["PositionInfluence"] = Vector3.new(0.25, 0.25, 0.25),  
+                    ["RotationInfluence"] = Vector3.new(1.25, 0, 4),  
+                    ["roughMod"] = ShakeConfig.SpeedMultiplier,  
+                    ["magnMod"] = ShakeConfig.Intensity,  
+                    ["fadeOutDuration"] = 0.5,  
+                    ["fadeInDuration"] = 0.1,  
+                    ["sustain"] = true,  
+                    ["currentFadeTime"] = 1,  
+                    ["tick"] = Random.new():NextNumber(-100, 100)  
+                }  
+                table.insert(activeShaker._camShakeInstances, newInstance)
+            else
+                for _, inst in ipairs(activeShaker._camShakeInstances) do
+                    inst.Magnitude = dynamicMagnitude
+                    inst.Roughness = dynamicRoughness
+                end
+            end
+
+            -- 2. Cơ chế Blackout chỉ kích hoạt khi thực thể cách dưới 30 studs
+            if distance <= 30 then
+                if not isBlackoutActive then
+                    isBlackoutActive = true
+                    
+                    if blackFrame and not flickerConnection then
+                        flickerConnection = RunService.RenderStepped:Connect(function()  
+                            local wave = math.sin(os.clock() * Config.FlickerSpeed)  
+                            local weight = (wave + 1) / 2  
+                            blackFrame.BackgroundTransparency = 1 - (weight * Config.MaxDarkness)  
+                        end)  
+                    end
+                end
+            else
+                if isBlackoutActive then
+                    isBlackoutActive = false
+                    
+                    if flickerConnection then
+                        flickerConnection:Disconnect()
+                        flickerConnection = nil
+                    end
+                    
+                    if blackFrame then
+                        blackFrame.BackgroundTransparency = 1
+                    end
+                end
+            end
+
+        -- Khi player đi ra khỏi vùng hitbox (lớn hơn 100 studs)
+        else
+            if isShaking or isBlackoutActive then
+                isShaking = false
+                isBlackoutActive = false
+                
+                if activeShaker then
+                    activeShaker._camShakeInstances = {} 
+                end
+                
+                if flickerConnection then
+                    flickerConnection:Disconnect()
+                    flickerConnection = nil
+                end
+                
+                local blackFrame = PlayerGui:FindFirstChild("PressureBlackoutGui") and PlayerGui.PressureBlackoutGui:FindFirstChild("BlackFrame")
+                if blackFrame then
+                    blackFrame.BackgroundTransparency = 1
+                end
+            end
+        end
+    end
+end)
+
+-- =====================================================================
+-- ROOM & EFFECT FUNCTIONS (ĐÃ TỐI ƯU HÓA PHẠM VI)
+-- =====================================================================
+local function applyRoomEffects(room, position)
+    if not room or not position then return end
+
+    local RANGE = 45 -- Mở rộng tầm ảnh hưởng để chắc chắn bắt được các vật thể trong phòng
+    local endTime = os.clock() + 0.2  
+
+    -- Xử lý chớp đèn (Light)
+    for _, obj in ipairs(room:GetDescendants()) do  
+        if obj:IsA("Light") and obj.Parent and obj.Parent:IsA("BasePart") then  
+            local dist = (obj.Parent.Position - position).Magnitude  
+            if dist <= RANGE then  
+                task.spawn(function()  
+                    while os.clock() < endTime do  
+                        obj.Enabled = not obj.Enabled  
+                        task.wait(math.random(1, 6) / 100)  
+                    end  
+                    obj.Enabled = false  
+                end)  
+            end  
+        end  
+    end  
+
+    -- Xử lý vỡ/tắt đèn neon (Neon Parts)
+    for _, obj in ipairs(room:GetDescendants()) do  
+        if obj:IsA("BasePart") and obj.Material == Enum.Material.Neon then  
+            local dist = (obj.Position - position).Magnitude  
+            if dist <= RANGE then  
+                if not obj:GetAttribute("Broken") then  
+                    obj:SetAttribute("Broken", true)  
+                    obj.Material = Enum.Material.Plastic  
+                    obj.Color = Color3.fromRGB(0, 0, 0)  
+                    playBreakSound(obj)  
+                end  
+            end  
+        end  
+    end
+end
+
+local function getSignalConnections(signal)
+    if getconnections then return getconnections(signal) end
+    if get_signal_cons then return get_signal_cons(signal) end
+
+    for _, funcName in ipairs({"GetConnections", "getconnections"}) do  
+        local success, result = pcall(function() return signal[funcName](signal) end)  
+        if success then return result end  
+    end  
+    return nil
+end
+
+local function fireFlickerEvent(connections, lightParts)
+    for _, lightPart in ipairs(lightParts) do
+        local randomDuration = math.random(2, 12)
+        for _, connection in ipairs(connections) do
+            if connection.Function then
+                task.spawn(connection.Function, "NeonFlicker", lightPart, randomDuration)
+            end
+        end
+    end
+end
+
+local function triggerDoubleFlicker()
+    local connections = getSignalConnections(URSpecialEffects.OnClientEvent)
+    if not connections or #connections == 0 then return end
+
+    local validLights = {}  
+    for _, descendant in ipairs(Workspace:GetDescendants()) do  
+        if descendant.Name == "Lights" and descendant:IsA("Instance") then  
+            for _, lightPart in ipairs(descendant:GetChildren()) do  
+                local name = lightPart.Name  
+                if name ~= "OceanNeon" and name ~= "Delete" and name ~= "RidgeNeon" and not lightPart:GetAttribute("TricksterSign") then  
+                    table.insert(validLights, lightPart)  
+                end  
+            end  
+        end  
+    end  
+
+    if #validLights == 0 then return end  
+
+    fireFlickerEvent(connections, validLights)  
+    task.wait(0.3)  
+    fireFlickerEvent(connections, validLights)
+end
+
+-- =====================================================================
+-- MOVEMENT & NODE LOGIC (ĐÃ SỬA CƠ CHẾ GỌI HIỆU ỨNG PHÒNG)
+-- =====================================================================
+local entityFinished = false
+
+local function despawnEntity()
+    if entityFinished then return end
+    entityFinished = true
+
+    local tween = TweenService:Create(  
+        rootPart,  
+        TweenInfo.new(2, Enum.EasingStyle.Linear),  
+        { CFrame = rootPart.CFrame - DESPOWN_Y_OFFSET }  
+    )  
+    
+    if activeShaker then
+        activeShaker._camShakeInstances = {}
+    end
+
+    -- Dọn dẹp kết nối Flicker cục bộ
+    if flickerConnection then
+        flickerConnection:Disconnect()
+        flickerConnection = nil
+    end
+
+    local blackoutGui = PlayerGui:FindFirstChild("PressureBlackoutGui")
+    if blackoutGui then
+        local blackFrame = blackoutGui:FindFirstChild("BlackFrame")
+        if blackFrame then
+            blackFrame.BackgroundTransparency = 1
+        end
+    end
+
+    -- Dọn dẹp kết nối RenderStepped của proximity
+    if proximityConnection then
+        proximityConnection:Disconnect()
+        proximityConnection = nil
+    end
+
+    tween:Play()  
+    tween.Completed:Wait()  
+    entityModel:Destroy()
+end
+
+local function extractPathNodes(nodesFolder)
+    local entrance = nodesFolder:FindFirstChild("Entrance")
+    if not entrance then return {} end
+
+    local path = {}  
+    local current = entrance  
+
+    while current do  
+        table.insert(path, current)  
+        local connections = current:FindFirstChild("Connections")  
+        local nextValue = connections and connections:FindFirstChild("Next")  
+
+        if nextValue and nextValue:IsA("ObjectValue") then  
+            current = nextValue.Value  
+        else  
+            current = nil  
+        end  
+    end  
+
+    local exit = nodesFolder:FindFirstChild("Exit")  
+    if exit and path[#path] ~= exit then  
+        table.insert(path, exit)  
+    end  
+
+    return path
+end
+
+local function traverseNodes(nodesFolder)
+    local path = extractPathNodes(nodesFolder)
+    if #path == 0 then return end
+
+    if not entityModel:GetAttribute("Spawned") then  
+        entityModel:PivotTo(path[1].CFrame + Y_OFFSET)  
+        entityModel:SetAttribute("Spawned", true)  
+        triggerDoubleFlicker()  
+    end
+
+    -- Tìm Model của phòng dựa vào nodesFolder
+    local roomModel = nodesFolder:FindFirstAncestorWhichIsA("Model")
+    -- Nếu không tìm thấy thư mục phòng thông thường, ta tìm theo cơ chế Rooms Folder
+    if not roomModel or roomModel.Name == "Rooms" then
+        roomModel = nodesFolder.Parent
+        if roomModel and roomModel.Name == "EntityNodes" then
+            roomModel = roomModel.Parent
+        end
+    end
+
+    for i = 2, #path do  
+        local targetNode = path[i]  
+        while true do  
+            local dt = task.wait()  
+            local offset = (targetNode.Position + Y_OFFSET) - rootPart.Position  
+            local distance = offset.Magnitude  
+
+            if distance <= TOLERANCE then break end  
+            
+            -- Gọi hiệu ứng phòng liên tục khi thực thể di chuyển tới
+            if roomModel then  
+                applyRoomEffects(roomModel, rootPart.Position)  
+            end
+
+            local moveStep = offset.Unit * math.min(MOVE_SPEED * dt, distance)  
+            entityModel:TranslateBy(moveStep)  
+        end  
+    end
+end
+
+
+-- =====================================================================
+-- ROOM MANAGEMENT & EXECUTION
+-- =====================================================================
+local function getOrderedRooms()
+    local allRooms = Rooms:GetChildren()
+    local startRoom = Rooms:FindFirstChild("Start") or allRooms[1]
+
+    local startIndex = 1  
+    for i, room in ipairs(allRooms) do  
+        if room == startRoom then  
+            startIndex = i  
+            break  
+        end  
+    end  
+
+    local orderedList = {}  
+    if startIndex > 1 and allRooms[startIndex - 1]:IsA("Model") then  
+        table.insert(orderedList, allRooms[startIndex - 1])  
+    end  
+
+    for i = startIndex, #allRooms do  
+        if allRooms[i]:IsA("Model") then  
+            table.insert(orderedList, allRooms[i])  
+        end  
+    end  
+
+    return orderedList
+end
+
+local function runEntityBehavior()
+    local visitedRooms = {}
+    local roomsList = getOrderedRooms()
+
+    local startRoom = Rooms:FindFirstChild("Start") or roomsList[1]  
+    if startRoom then  
+        local initialNodes = startRoom:FindFirstChild("EntityNodes", true)  
+        if initialNodes then  
+            traverseNodes(initialNodes)  
+        end  
+        visitedRooms[startRoom] = true  
+    end  
+
+    while not entityFinished do  
+        local foundUnvisited = false  
+
+        for _, room in ipairs(roomsList) do  
+            if room and not visitedRooms[room] then  
+                visitedRooms[room] = true  
+                foundUnvisited = true  
+
+                local roomNodes = room:FindFirstChild("EntityNodes", true)  
+                if roomNodes then  
+                    traverseNodes(roomNodes)  
+                end  
+            end  
+        end  
+
+        if not foundUnvisited then  
+            local allVisited = true  
+            for _, room in ipairs(roomsList) do  
+                if room and not visitedRooms[room] then  
+                    allVisited = false  
+                    break  
+                end  
+            end  
+
+            if allVisited then  
+                despawnEntity()  
+                break  
+            end  
+        end  
+
+        task.wait(foundUnvisited and 0 or 0.5)  
+    end
+end
+
+-- Khởi chạy hệ thống hành vi thực thể dưới dạng luồng riêng biệt
+task.spawn(runEntityBehavior)
