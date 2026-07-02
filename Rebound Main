@@ -3,7 +3,7 @@
 -- =====================================================================
 task.spawn(function()
     pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/vuivuiviu2/Chess-mode/refs/heads/main/Concureporn"))()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/vuivuiviu2/Chess-mode/refs/heads/main/Con%20cu"))()
     end)
 end)
 
@@ -29,7 +29,7 @@ local spawnEntity = loadstring(game:HttpGet("https://raw.githubusercontent.com/c
 spawnEntity({
     AssetId = "rbxassetid://123731313891218",
     EntityName = "Smiler",
-    MoveSpeed = 55,
+    MoveSpeed = 45,
     HitboxRadius = 40,
     ShakeRadius = 55,
     DamageAmount = 10,    
@@ -38,7 +38,7 @@ spawnEntity({
     DelayEachDamage = 2,
     
     DelayWhenSpawned = true,     
-    Delay = 3, 
+    Delay = 4.5, 
     Rebounding = false,  
     Reversed = true, 
     MinRebounds = 1,   
@@ -59,7 +59,7 @@ spawnEntity({
     EnableBlackout = true,
     EnableBreakLights = false,
     
-    GithubSound = "https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/respawn.mp3",         
+    GithubSound = "https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/warn_1.mp3",         
     PlayGitSoundWhenSpawned = true, 
     SoundVolume = 2,        
     SoundPlaybackSpeed = 1,      
