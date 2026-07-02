@@ -29,13 +29,13 @@ local spawnEntity = loadstring(game:HttpGet("https://raw.githubusercontent.com/c
 spawnEntity({
     AssetId = "rbxassetid://123731313891218",
     EntityName = "Smiler",
-    MoveSpeed = 45,
+    MoveSpeed = 55,
     HitboxRadius = 40,
     ShakeRadius = 55,
-    DamageAmount = 10,    
+    DamageAmount = 45,    
     InstantKill = false,
-    ConstantBloodSucking = false,
-    DelayEachDamage = 2,
+    ConstantBloodSucking = true,
+    DelayEachDamage = 0.1,
     
     DelayWhenSpawned = true,     
     Delay = 4.5, 
