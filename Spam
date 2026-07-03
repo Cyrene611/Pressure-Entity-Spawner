@@ -1,16 +1,16 @@
 local Config = {
     ItemLocker = {
-        LoopCount = 25,
+        LoopCount = 130,
         MinWait = 0.1,
         MaxWait = 0.3
     },
     Drawer = {
-        LoopCount = 11,
+        LoopCount = 110,
         MinWait = 0.5,
         MaxWait = 0.8
     },
     LockerBase = {
-        LoopCount = 11,
+        LoopCount = 110,
         MinWait = 0.5,
         MaxWait = 0.8
     }
