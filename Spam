@@ -1,0 +1,95 @@
+local Config = {
+    ItemLocker = {
+        LoopCount = 25,
+        MinWait = 0.1,
+        MaxWait = 0.3
+    },
+    Drawer = {
+        LoopCount = 11,
+        MinWait = 0.5,
+        MaxWait = 0.8
+    },
+    LockerBase = {
+        LoopCount = 11,
+        MinWait = 0.5,
+        MaxWait = 0.8
+    }
+}
+
+local function triggerGhostSpamBypass()
+    local roomsFolder = workspace:FindFirstChild("GameplayFolder") and workspace.GameplayFolder:FindFirstChild("Rooms")
+    if not roomsFolder then return end
+
+    local validInteractions = {}
+
+    for _, v6 in pairs(roomsFolder:GetChildren()) do
+        for _, v7 in pairs(v6:GetChildren()) do
+            if v7:IsA("Model") and (v7:GetAttribute("InteractionType") == "DrawerBase" or (v7:GetAttribute("InteractionType") == "LockerBase" or v7:GetAttribute("InteractionType") == "ItemLocker")) then
+                table.insert(validInteractions, v7)
+            end
+        end
+        
+        if v6:FindFirstChild("Interactables") then
+            for _, v8 in pairs(v6.Interactables:GetChildren()) do
+                if v8:IsA("Model") and (v8:GetAttribute("InteractionType") == "DrawerBase" or (v8:GetAttribute("InteractionType") == "LockerBase" or v8:GetAttribute("InteractionType") == "ItemLocker")) then
+                    table.insert(validInteractions, v8)
+                end
+            end
+        end
+    end
+
+    if #validInteractions == 0 then return end
+
+    for _, v_u_9 in pairs(validInteractions) do
+        local interactionType = v_u_9:GetAttribute("InteractionType")
+        
+        if interactionType == "ItemLocker" and v_u_9:FindFirstChild("Closed") then
+            task.spawn(function()
+                local cfg = Config.ItemLocker
+                for _ = 0, cfg.LoopCount do
+                    task.wait(math.random(cfg.MinWait * 10, cfg.MaxWait * 10) * 0.1)
+                    if v_u_9:FindFirstChild("Closed") then
+                        v_u_9.Closed.Value = not v_u_9.Closed.Value
+                    end
+                end
+            end)
+
+        elseif interactionType == "DrawerBase" and v_u_9:FindFirstChild("Drawers") then
+            for _, v_u_12 in pairs(v_u_9.Drawers:GetChildren()) do
+                if v_u_12:FindFirstChild("Drawer") and v_u_12.Drawer:FindFirstChild("OpenValue") then
+                    task.spawn(function()
+                        local cfg = Config.Drawer
+                        for _ = 0, cfg.LoopCount do
+                            task.wait(math.random(cfg.MinWait * 10, cfg.MaxWait * 10) * 0.1)
+                            if v_u_12:FindFirstChild("Drawer") and v_u_12.Drawer:FindFirstChild("OpenValue") then
+                                v_u_12.Drawer.OpenValue.Value = not v_u_12.Drawer.OpenValue.Value
+                            end
+                        end
+                    end)
+                end
+            end
+
+        elseif interactionType == "LockerBase" and v_u_9:FindFirstChild("Folder") and v_u_9.Folder:FindFirstChild("OpenValue") then
+            task.spawn(function()
+                local cfg = Config.LockerBase
+                for v13 = 0, cfg.LoopCount do
+                    if v_u_9.Folder:FindFirstChild("PlayerIn") and v_u_9.Folder.PlayerIn.Value then
+                        return
+                    end
+                    
+                    task.wait(math.random(cfg.MinWait * 10, cfg.MaxWait * 10) * 0.1)
+                    if v_u_9.Folder:FindFirstChild("OpenValue") then
+                        if v13 % 2 == 0 then
+                            v_u_9.Folder.OpenValue.Value = "enter"
+                        else
+                            v_u_9.Folder.OpenValue.Value = "exit"
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end
+
+triggerGhostSpamBypass()
+
