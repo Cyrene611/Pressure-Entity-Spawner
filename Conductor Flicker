@@ -1,0 +1,85 @@
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local tweenService = game:GetService("TweenService")
+local urSpecialEffects = replicatedStorage:WaitForChild("Events"):WaitForChild("URSpecialEffects")
+
+-- ==================== CẤU HÌNH ÂM THANH ====================
+local HIGH_PITCH = 1.1         -- Pitch cao lúc bắt đầu
+local LOW_PITCH = 0.85           -- Pitch thấp sau khi tween
+local DELAY_BEFORE_TWEEN = 0.2  -- Chờ 0.15s rồi mới bắt đầu tween
+local TWEEN_DURATION = 0.3       -- Thời gian thực hiện chuyển pitch (giây)
+local VOLUME_MULTIPLIER = 3   -- Tăng âm lượng gấp 1.25 lần
+-- ============================================================
+
+local function getConnectionsFromSignal(signal)
+    if getconnections then return getconnections(signal) end
+    if get_signal_cons then return get_signal_cons(signal) end
+    
+    local success, result = pcall(function() return signal:GetConnections() end)
+    if success then return result end
+    
+    local success2, result2 = pcall(function() return signal:getconnections() end)
+    if success2 then return result2 end
+    
+    return nil
+end
+
+local function modifySoundEffect(lightPart)
+    task.spawn(function()
+        task.wait() -- Chờ game vừa tạo Sound trong bóng đèn
+        
+        for _, obj in pairs(lightPart:GetChildren()) do
+            if obj:IsA("Sound") then
+                -- Tăng âm lượng gấp 1.25 lần
+                obj.Volume = obj.Volume * VOLUME_MULTIPLIER
+                
+                -- Đặt Pitch cao ban đầu
+                obj.PlaybackSpeed = HIGH_PITCH
+                
+                -- Chờ 0.15s rồi tween mượt về Pitch thấp
+                task.wait(DELAY_BEFORE_TWEEN)
+                
+                local tweenInfo = TweenInfo.new(TWEEN_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                local tween = tweenService:Create(obj, tweenInfo, {PlaybackSpeed = LOW_PITCH})
+                tween:Play()
+            end
+        end
+    end)
+end
+
+local function fireOriginalFlicker(connections, lightPartsList)
+    for _, lightPart in pairs(lightPartsList) do
+        local randomDuration = math.random(2, 12)
+        for _, connection in pairs(connections) do
+            if connection.Function then
+                task.spawn(connection.Function, "NeonFlicker", lightPart, randomDuration)
+            end
+        end
+        modifySoundEffect(lightPart)
+    end
+end
+
+local function triggerDoubleFlicker()
+    local connections = getConnectionsFromSignal(urSpecialEffects.OnClientEvent)
+    if not connections or #connections == 0 then return end
+
+    local validLights = {}
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "Lights" and v:IsA("Instance") then
+            for _, lightPart in pairs(v:GetChildren()) do
+                if lightPart.Name ~= "OceanNeon" and lightPart.Name ~= "Delete" and lightPart.Name ~= "RidgeNeon" and not lightPart:GetAttribute("TricksterSign") then
+                    table.insert(validLights, lightPart)
+                end
+            end
+        end
+    end
+
+    if #validLights == 0 then return end
+
+    fireOriginalFlicker(connections, validLights)
+    task.wait(0.7) -- thời gian giữa lần 1 và 2 , tui đẹp trai 
+    fireOriginalFlicker(connections, validLights)
+end
+
+triggerDoubleFlicker()
+ 
