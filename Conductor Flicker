@@ -77,7 +77,7 @@ local function triggerDoubleFlicker()
     if #validLights == 0 then return end
 
     fireOriginalFlicker(connections, validLights)
-    task.wait(0.7) -- thời gian giữa lần 1 và 2 , tui đẹp trai 
+    task.wait(0.01) -- thời gian giữa lần 1 và 2 , tui đẹp trai 
     fireOriginalFlicker(connections, validLights)
 end
 
