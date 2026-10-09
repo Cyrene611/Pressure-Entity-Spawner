@@ -93,7 +93,7 @@ local spawnEntity = loadstring(game:HttpGet("https://codeberg.org/qjjdjdjjd/Pres
 spawnEntity({
     AssetId = "rbxassetid://105860009126926",
     EntityName = "ReboundChild",
-    MoveSpeed = 200, -- Tốc độ ban đầu khi vừa Spawn (200)
+    MoveSpeed = 100, -- Tốc độ ban đầu khi vừa Spawn (200)
     HitboxRadius = 32,
     ShakeRadius = 176,
     DamageAmount = 5,    
@@ -158,9 +158,9 @@ spawnEntity({
     OnSpawn = function(self)
         -- HỆ THỐNG ĐIỀU CHỈNH TỐC ĐỘ DỰA TRÊN KHOẢNG CÁCH VÀ SÁT THƯƠNG
         task.spawn(function()
-            local originalSpeed = 200
-            local nearDistance = 100
-            local nearSpeed = 60
+            local originalSpeed = 100
+            local nearDistance = 200
+            local nearSpeed = 72
             local damageSpeed = 10
 
             local player = game:GetService("Players").LocalPlayer
