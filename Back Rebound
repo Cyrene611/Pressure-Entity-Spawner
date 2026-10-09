@@ -160,7 +160,7 @@ spawnEntity({
         task.spawn(function()
             local originalSpeed = 200
             local nearDistance = 100
-            local nearSpeed = 60
+            local nearSpeed = 70
             local damageSpeed = 10
 
             local player = game:GetService("Players").LocalPlayer
