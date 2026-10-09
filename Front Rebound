@@ -1,0 +1,225 @@
+-- =====================================================================
+-- CHẠY SCRIPT GITHUB NGAY LẬP TỨC KHI RUN SCRIPT
+-- =====================================================================
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://github.com/vuivuiviu2/Chess-mode/raw/refs/heads/main/Concureporn"))()
+    end)
+end)
+
+-- =====================================================================
+-- HÀM TẢI ÂM THANH CHUẨN TỪ GITHUB (CHỐNG LỖI AUTHORIZED)
+-- =====================================================================
+local function GitAud(soundlink, filename)
+    local url = soundlink
+    local FileName = filename
+    if not isfile(FileName..".mp3") then
+        writefile(FileName..".mp3", game:HttpGet(url))
+    end
+    return (getcustomasset or getsynasset)(FileName..".mp3")
+end
+
+-- Tải trước các âm thanh cho Smiler
+local SoundFar1Id = GitAud("https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/far1.mp3", "Smiler_Far1")
+local SoundFar2Id = GitAud("https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/far2%20spawn.mp3", "Smiler_Far2")
+local SoundNearId = GitAud("https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/near.mp3", "Smiler_Near")
+local SoundRespawnId = GitAud("https://github.com/vuivuiviu2/Pressure-Hardcore-Mode/raw/refs/heads/main/respawn.mp3", "Smiler_respawn")
+
+-- =====================================================================
+-- TÁCH RIÊNG: PHÁT ÂM THANH NGAY LẬP TỨC KHI EXECUTE
+-- =====================================================================
+task.spawn(function()
+    -- 🔊 1. Phát sound respawn ngay tức thì vào workspace
+    local SoundRespawn = Instance.new("Sound")
+    SoundRespawn.Name = "RespawnSound"
+    SoundRespawn.SoundId = SoundRespawnId
+    SoundRespawn.Volume = 1.35
+    SoundRespawn.Parent = workspace
+    SoundRespawn:Play()
+    game:GetService("Debris"):AddItem(SoundRespawn, 10)
+
+    -- 🔊 2. Lắng nghe workspace để gắn Sound 3D ngay khi Model "ReboundChild" vừa xuất hiện
+    local entityModel = workspace:WaitForChild("ReboundChild", 10)
+    if entityModel then
+        local entityRoot = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart") or entityModel:WaitForChild("HumanoidRootPart", 5)
+        
+        if entityRoot then
+            local SoundFar1 = Instance.new("Sound")
+            SoundFar1.Name = "FarSound1"
+            SoundFar1.SoundId = SoundFar1Id
+            SoundFar1.Volume = 0.5
+            SoundFar1.RollOffMaxDistance = 200
+            SoundFar1.RollOffMinDistance = 20
+            SoundFar1.RollOffMode = Enum.RollOffMode.Linear
+            SoundFar1.Looped = true
+            SoundFar1.Parent = entityRoot
+            SoundFar1:Play()
+            
+            local SoundFar2 = Instance.new("Sound")
+            SoundFar2.Name = "FarSound2"
+            SoundFar2.SoundId = SoundFar2Id
+            SoundFar2.Volume = 4
+            SoundFar2.RollOffMaxDistance = 200
+            SoundFar2.RollOffMinDistance = 20
+            SoundFar2.RollOffMode = Enum.RollOffMode.Linear
+            SoundFar2.Looped = true
+            SoundFar2.Parent = entityRoot
+            SoundFar2:Play()
+            
+            local SoundNear = Instance.new("Sound")
+            SoundNear.Name = "NearSound"
+            SoundNear.SoundId = SoundNearId
+            SoundNear.Volume = 4
+            SoundNear.RollOffMaxDistance = 55
+            SoundNear.RollOffMinDistance = 5
+            SoundNear.RollOffMode = Enum.RollOffMode.Linear
+            SoundNear.Looped = true
+            SoundNear.Parent = entityRoot
+            SoundNear:Play()
+        end
+    end
+end)
+
+-- =====================================================================
+-- BIẾN THEO DÕI THỜI GIAN GÂY SÁT THƯƠNG
+-- =====================================================================
+local lastDamageTick = 0
+
+-- =====================================================================
+-- SPAWNER CHẠY ĐỘC LẬP BÊN DƯỚI
+-- =====================================================================
+local spawnEntity = loadstring(game:HttpGet("https://codeberg.org/qjjdjdjjd/Pressure-Files/raw/branch/main/Pressure-Entity-Spawner"))()
+
+spawnEntity({
+    AssetId = "rbxassetid://105860009126926",
+    EntityName = "ReboundChild",
+    MoveSpeed = 100, -- Tốc độ ban đầu khi vừa Spawn (200)
+    HitboxRadius = 32,
+    ShakeRadius = 176,
+    DamageAmount = 5,    
+    InstantKill = false,
+    ConstantBloodSucking = true,
+    DelayEachDamage = 0.05,
+    
+    DelayWhenSpawned = true,     
+    Delay = 3, 
+    Rebounding = false,  
+    Reversed = true, 
+    MinRebounds = 1,   
+    MaxRebounds = 1,
+    DelayEachRebound = 0,
+    WallPenetrating = false,
+    IgnoreHiding = true,
+    RoomLimits = false,
+    RoomLimitValue = 5,
+    EntityLifeTime = "Forever",
+    
+    YOffset = Vector3.new(0, 2, 0),
+    DespawnYOffset = Vector3.new(0, 30, 0),
+    Tolerance = 0.1,
+    FlickerSpeed = 75,
+    MaxDarkness = 0.2,
+    ShakeIntensity = 2,
+    ShakeSpeedMultiplier = 1.5,
+    LightFlickerTime = 10,   
+
+    DeafModeFrameTransparency = 1,
+    DeafModeFrameColor = Color3.new(1, 1, 1),
+    DeafModeFrameId = "rbxassetid://135625259700248",
+    DeafModeFrameDistance = 400,
+    DependsOnSpeed = true,
+    
+    EnableFlicker = false,
+    EnableShake = true,
+    EnableBlackout = false,
+    EnableBreakLights = false,
+    
+    GithubSound = "",         
+    PlayGitSoundWhenSpawned = false, 
+    SoundVolume = 2,        
+    SoundPlaybackSpeed = 1,
+
+    LightBreakRange = 35,                          
+    LightDarkenPercent = 0.11,                
+    LightAutoScanInterval = 0.1,              
+    
+    LightSoundId = "rbxassetid://13303926122", 
+    LightSoundVolume = 2,                   
+    LightSoundDistance = 150,                 
+    
+    LightParticleTexture = "rbxassetid://257173628", 
+    LightParticleDuration = 0.3,
+    
+    DeathImage = "rbxassetid://11417375410",
+    DeathName = "R-3303",
+    DeathNotes = "Ummmm",
+    DeathImageColor = Color3.fromRGB(255, 255, 255),
+    
+    OnSpawn = function(self)
+        -- HỆ THỐNG ĐIỀU CHỈNH TỐC ĐỘ DỰA TRÊN KHOẢNG CÁCH VÀ SÁT THƯƠNG
+        task.spawn(function()
+            local originalSpeed = 200
+            local nearDistance = 100
+            local nearSpeed = 60
+            local damageSpeed = 10
+
+            local player = game:GetService("Players").LocalPlayer
+            local RunService = game:GetService("RunService")
+            local lastCFrame = nil
+            local speedConn
+
+            speedConn = RunService.Heartbeat:Connect(function()
+                local entityModel = (self and self.Model) or workspace:FindFirstChild("ReboundChild")
+                if not entityModel or not entityModel.Parent then
+                    if speedConn then speedConn:Disconnect() end
+                    return
+                end
+
+                local root = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart")
+                local char = player.Character
+                local pRoot = char and char:FindFirstChild("HumanoidRootPart")
+
+                if root and pRoot then
+                    local currentCFrame = root.CFrame
+
+                    if lastCFrame then
+                        local distToPlayer = (root.Position - pRoot.Position).Magnitude
+                        local targetSpeed = originalSpeed
+
+                        -- Ưu tiên 1: Đang trong thời gian gây sát thương -> Giảm tốc về 10
+                        if (os.clock() - lastDamageTick) < 0.25 then
+                            targetSpeed = damageSpeed
+                        -- Ưu tiên 2: Đến gần người chơi dưới 90 studs -> Giảm tốc về 55
+                        elseif distToPlayer <= nearDistance then
+                            targetSpeed = nearSpeed
+                        end
+
+                        local speedRatio = targetSpeed / originalSpeed
+
+                        -- Xử lý Ghìm tốc độ di chuyển CFrame
+                        if speedRatio < 1 then
+                            local deltaVec = currentCFrame.Position - lastCFrame.Position
+                            if deltaVec.Magnitude > 0.001 then
+                                local newPos = lastCFrame.Position + (deltaVec * speedRatio)
+                                local newCFrame = CFrame.new(newPos) * currentCFrame.Rotation
+                                entityModel:PivotTo(newCFrame)
+                                currentCFrame = newCFrame
+                            end
+                        end
+                    end
+
+                    lastCFrame = currentCFrame
+                end
+            end)
+        end)
+    end,
+    OnMoveStart = function() end,
+    OnRoomEnter = function(roomName) end,
+    OnDamagePlayer = function()
+        -- Cập nhật thời điểm vừa gây sát thương để kích hoạt tốc độ 10
+        lastDamageTick = os.clock()
+    end,
+    OnKillPlayer = function() end,
+    OnDespawning = function() end,
+    OnDespawned = function() end,
+})
